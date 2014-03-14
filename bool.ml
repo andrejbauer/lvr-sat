@@ -1,22 +1,22 @@
 (* Podatkovni tip za predstavitev boolovih izrazov *)
 
-type bool =
+type 'a bool =
   | True
   | False
-  | Var of string
-  | Not of bool
-  | Or of bool list
-  | And of bool list
+  | Var of 'a
+  | Not of 'a bool
+  | Or of 'a bool list
+  | And of 'a bool list
 
 (* Podatkovni tipi za predstavitev CNF izrazov *)
 
-type literal =
-  | Lit of string
-  | Til of string
+type 'a literal =
+  | Lit of 'a (* spremenljivka, npr. Lit "x" *)
+  | Til of 'a (* negirana spremenljivka, "til" je "lit" nazaj ha ha ha *)
 
-type clause = Clause of literal list
+type 'a clause = Clause of 'a literal list (* npr. Clause [Lit "x"; Til "y"] *)
 
-type cnf = CNF of clause list
+type 'a cnf = CNF of 'a clause list
 
 (* Nekaj pomoznih funkcij *)
 
@@ -41,8 +41,16 @@ let rec vrednost v p =
     | False -> false
     | Var x -> List.assoc x v
     | Not q -> not (vrednost v q) 
-    | Or qs -> List.fold_left (fun b q -> b || vrednost v q) false qs
-    | And qs -> List.fold_left (fun b q -> b && vrednost v q) true qs
+    | Or qs -> vrednost_or v qs
+    | And qs -> vrednost_and v qs
+
+and vrednost_or v = function
+  | [] -> false
+  | p :: ps -> (vrednost v p) || (vrednost_or v ps)
+
+and vrednost_and v = function
+  | [] -> true
+  | p :: ps -> (vrednost v p) && (vrednost_and v ps)
 
 (* Spremenljivke, ki se pojavljajo v formuli *)
 let vars p =
