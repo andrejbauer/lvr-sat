@@ -38,22 +38,52 @@ let rec eval_clause v ls =
 
 exception Unsatisfiable
 
+let pure cs = 
+  let rec pure xs ys zs = function
+    | [] -> (xs, ys, zs)
+    | (Clause c) :: cs ->
+      let (xs, ys, zs) =
+        List.fold_left (fun (xs, ys, zs) -> function
+          | Lit v ->
+            if List.mem v zs then (xs, ys, zs)
+            else if List.mem v ys then (xs, del v ys, add v zs) 
+            else (add v xs, ys, zs)
+          | Til v -> 
+            if List.mem v zs then (xs, ys, zs)
+            else if List.mem v xs then (del v xs, ys, add v zs)
+            else (xs, add v ys, zs)
+        ) (xs, ys, zs) c
+      in
+        pure xs ys zs cs
+  in
+    pure [] [] [] cs
+
 let dpll p =
+  let sorted_clauses cs =
+    List.map 
+      (fun (_, c) -> Clause c)
+      (List.sort Pervasives.compare
+         (List.map (fun (Clause c) -> (List.length c, c)) cs))
+  in
   let rec search v xs cs =
     try
       (* Poberemo iz stavkov cs tiste, ki jih znamo takoj obravnavati.
          Sproti si gradimo valuacijo v in seznam xs spremenljivk, ki jih
          je se treba obdelati. *)
+      let (us, vs, xs) = pure cs in
+      let v = List.fold_left (fun v x -> set x true v) v us in
+      let v = List.fold_left (fun v x -> set x false v) v vs in
       let (v, xs, cs) =
         List.fold_left
           (fun (v, xs, cs) (Clause c) ->
             match eval_clause v c with
               | None -> (v, xs, cs)
               | Some [] -> raise Unsatisfiable
-              | Some [Lit x] -> ((x,true) :: v, del x xs, cs)
-              | Some [Til x] -> ((x,false) :: v, del x xs, cs)
+              | Some [Lit x] -> (set x true v, del x xs, cs)
+              | Some [Til x] -> (set x false v, del x xs, cs)
               | Some ls -> (v, xs, Clause ls :: cs))
-          (v, xs, []) cs
+          (v, xs, [])
+          (sorted_clauses cs)
       in
         begin match cs with
           | [] -> Some v
@@ -61,10 +91,10 @@ let dpll p =
             (match xs with
               | [] -> assert false (* XXX to verjetno ni prav,
                                       premisli o izboljsavah in pravilnosti *)
-              | x :: xs' ->
-                (match search ((x, false) :: v) xs' cs with
+              | x :: xs ->
+                (match search (set x false v) (del x xs) cs with
                   | Some v -> Some v
-                  | None -> search ((x, true) :: v) xs cs))
+                  | None -> search (set x true v) (del x xs) cs))
         end
     with
       | Unsatisfiable -> None

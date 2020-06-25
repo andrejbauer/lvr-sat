@@ -26,6 +26,21 @@ let add x lst =
 let rec del x = function
   | [] -> []
   | y :: lst -> if x = y then lst else y :: del x lst
+
+exception AlreadyThere
+
+let set x b v =
+  let rec loop = function
+    | [] -> [(x, b)]
+    | (x', b') :: lst ->
+      if x = x'
+      then if b = b' then raise AlreadyThere else assert false
+      else (x', b') :: loop lst
+  in
+    try
+      loop v
+    with
+      | AlreadyThere -> v
   
 let rec lookup x = function
   | [] -> None
@@ -84,8 +99,8 @@ let cnf p =
   let rec convert cs = function
     | True -> cs
     | False -> [Clause []]
-    | Var x -> (Clause [Lit x]) :: cs
-    | Not (Var x) -> (Clause [Til x]) :: cs
+    | Var x -> add (Clause [Lit x]) cs
+    | Not (Var x) -> add (Clause [Til x]) cs
     | Not _ -> assert false
     | And ps -> List.fold_left convert cs ps
     | Or [] -> [Clause []]
@@ -95,7 +110,7 @@ let cnf p =
       let es = convert [] (Or ps) in
         List.fold_left
           (fun cs (Clause d) ->
-            List.fold_left (fun cs (Clause e) -> (Clause (d @ e)) :: cs) cs es)
+            List.fold_left (fun cs (Clause e) -> (add (Clause (d @ e))) cs) cs es)
           cs ds
   in
     CNF (convert [] (nnf p))
